@@ -8,7 +8,7 @@ This project analyzes SC Johnson's ["This We Believe"](https://www.scjohnson.com
 - Generates word clouds with sentiment-aware and color-customized styling
 
 ## Output
-You can view the full results in the knitted HTML file: `scj_text_analysis.html` (generated from `scj_text_analysis.Rmd`).
+You can view the full results in the knitted HTML file: `scj_text_analysis.html` (generated from `scj_text_analysis.Rmd`) here: https://jgovernor.github.io/SCJohnson/
 
 ## Tools used
 - R
