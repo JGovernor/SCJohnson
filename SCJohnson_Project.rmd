@@ -1,0 +1,138 @@
+---
+title: "SC Johnson About Us text analysis"
+author: "Jesse D"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Load necessary libraries
+
+```{r}
+library(tm)
+library(XML)
+```
+
+Read data file from website (SC Johnson- What we believe) 
+
+```{r}
+scj_url <- URLencode("https://www.scjohnson.com/en/about-us/this-we-believe")
+scj_html <- readLines(scj_url, warn = FALSE)
+doc.html <- htmlTreeParse(scj_html, asText = TRUE, useInternal = TRUE)
+```
+
+Remove HTML code from downloaded file:
+  
+```{r}
+scj_text <- unlist(xpathApply(doc.html, "//p", xmlValue))
+scj_text <- gsub("\\.\\.\\.|\\b[[:punct:]]+\\b", "", scj_text)
+head(scj_text)
+```
+
+Create corpus. Note: usually a corpus is comprised of a large collection of documents. Here
+we analyze a single document (broken into 16 parts by "Corpus").
+
+```{r}
+# Create corpus from SC Johnson text
+scj_text <- gsub("\\.\\.\\.", "", scj_text)
+words.vec     <- VectorSource(scj_text)
+words.corpus  <- Corpus(words.vec)
+
+# Inspect structure
+str(scj_text)
+str(words.vec)
+words.corpus
+```
+
+Do some data wrangling:
+
+```{r}
+words.corpus <- tm_map(words.corpus, content_transformer(tolower))
+words.corpus <- tm_map(words.corpus, content_transformer(removePunctuation))
+words.corpus <- tm_map(words.corpus, content_transformer(removeNumbers))
+words.corpus <- tm_map(words.corpus, removeWords, stopwords("english"))
+words.corpus <- tm_map(words.corpus, removeWords, 
+                       c("...", "scjohnson", "johnson", 
+                         "believe", "users", "world", 
+                         "around", "market", "among", "company", "corporate", "country", "every", "business"))
+ # custom stopwords
+```
+
+Create a term-document matrix:
+
+```{r}
+tdm <- TermDocumentMatrix(words.corpus)
+tdm
+inspect(tdm)
+```
+
+Examine a simple term-document matrix representation by converting to a matrix.
+
+```{r}
+m <- as.matrix(tdm);  m
+
+wordCounts <-  rowSums(m)             
+myNames    <-  names(wordCounts)        
+
+checkWordCounts <- sort(wordCounts,decreasing=TRUE)
+head(checkWordCounts)
+```
+
+Perform Cluster Analysis
+
+```{r}
+library(cluster); library(lsa)
+
+m1 <- t(m)
+m2 <- m1[,colSums(m1) > 1]
+
+mycos <- as.dist(1-cosine(m2))                                         # Cosine Distance Matrix Between Terms
+
+agnes.out <- agnes(mycos, method ="ward",stand = TRUE )                # Agglom . Clust .
+
+pltree(agnes.out, main =" ", ylab =" ", xlab =" ", yaxt ="n", sub=" ") # Create the Dendogram and 
+rect.hclust(agnes.out, k=6 , border ="red")                            # draw boxes around groups
+```
+
+Create simple word cloud using 
+(Use "words" / "word counts" to create data frame for word clouds (cloudFrame))
+
+```{r}
+library(wordcloud)
+cloudFrame <- data.frame(word = myNames, freq=wordCounts)
+wordcloud(cloudFrame$word,cloudFrame$freq)
+```
+
+Create wordcloud with arbitrary colors:
+
+```{r}
+# Run once to get frequency-sorted words filtered by wordcloud's rules
+word_limit <- 50
+min_freq <- 2
+
+# Temporarily get the words that would be used
+filtered <- cloudFrame[cloudFrame$freq >= min_freq, ]
+filtered <- filtered[order(filtered$freq, decreasing = TRUE), ]
+displayed <- head(filtered, word_limit)
+
+# Assign one dark-ish color per displayed word
+set.seed(123)  # for reproducibility
+dark_colors <- grep("white|ivory|light|gray|grey|beige|blanched|misty|lavender|lemon|peach|snow|honeydew|azure|mint|cream|cornsilk|seashell|linen|antique", 
+                    colors(), value = TRUE, invert = TRUE)
+
+color_list <- sample(dark_colors, nrow(displayed))
+
+# Now generate the word cloud
+wordcloud(words = displayed$word,
+          freq = displayed$freq,
+          max.words = word_limit,
+          min.freq = min_freq,
+          random.order = FALSE,
+          ordered.colors = TRUE,
+          rot.per = 0.35,
+          colors = color_list)
+
+```
+
+
